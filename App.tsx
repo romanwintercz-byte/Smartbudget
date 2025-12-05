@@ -6,10 +6,12 @@ import { BudgetChart } from './components/BudgetChart.tsx';
 import { Advisor } from './components/Advisor.tsx';
 import { HistoryChart } from './components/HistoryChart.tsx';
 import { MonthSelector } from './components/MonthSelector.tsx';
+import { YearSelector } from './components/YearSelector.tsx';
 import { CategoryDetailModal } from './components/CategoryDetailModal.tsx';
 import { SavingsAccountsChart } from './components/SavingsAccountsChart.tsx';
+import { AnnualReportModal } from './components/AnnualReportModal.tsx';
 import { Transaction, BUDGET_RULES, CategoryType, ImportedDocument, AccountMetadata } from './types.ts';
-import { Wallet, Settings, LayoutDashboard, Plus, FileText, Trash2, ExternalLink } from 'lucide-react';
+import { Wallet, Settings, LayoutDashboard, Plus, Users, FileText, Trash2, ExternalLink, PieChart } from 'lucide-react';
 
 const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -29,6 +31,10 @@ const App: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'manual' | 'upload'>('manual');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAnnualReportOpen, setIsAnnualReportOpen] = useState(false);
+  
+  // Date State
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   
   // Modal state
@@ -47,28 +53,42 @@ const App: React.FC = () => {
     localStorage.setItem('sb_documents', JSON.stringify(documents));
   }, [documents]);
 
-  // Compute available months from transactions
-  const availableMonths = useMemo(() => {
-    const months = new Set(transactions.map(t => {
-      const d = new Date(t.date);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    }));
-    return Array.from(months).sort();
+  // Compute available Years
+  const availableYears = useMemo(() => {
+    const years = new Set(transactions.map(t => new Date(t.date).getFullYear()));
+    // Always include current year
+    years.add(new Date().getFullYear());
+    return Array.from(years).sort((a, b) => a - b);
   }, [transactions]);
 
-  // Set default month to latest available or current
+  // Compute available Months FOR THE SELECTED YEAR
+  const availableMonths = useMemo(() => {
+    const months = new Set(transactions
+      .filter(t => new Date(t.date).getFullYear() === selectedYear)
+      .map(t => {
+        const d = new Date(t.date);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      }));
+    return Array.from(months).sort();
+  }, [transactions, selectedYear]);
+
+  // Set default month when switching years or loading
   useEffect(() => {
-    if (availableMonths.length > 0 && !selectedMonth) {
-      setSelectedMonth(availableMonths[availableMonths.length - 1]);
-    } else if (availableMonths.length > 0 && !availableMonths.includes(selectedMonth)) {
-       // If selected month was deleted or no longer valid
-       setSelectedMonth(availableMonths[availableMonths.length - 1]);
-    } else if (transactions.length === 0 && !selectedMonth) {
-       // Default to current month if no data
-       const now = new Date();
-       setSelectedMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+    if (availableMonths.length > 0) {
+        // If current selected month is not in the new available list, switch to the last available month
+        if (!selectedMonth || !availableMonths.includes(selectedMonth)) {
+            setSelectedMonth(availableMonths[availableMonths.length - 1]);
+        }
+    } else {
+        // No transactions for this year yet, default to first month of year or current month
+        const now = new Date();
+        if (selectedYear === now.getFullYear()) {
+            setSelectedMonth(`${selectedYear}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+        } else {
+            setSelectedMonth(`${selectedYear}-01`);
+        }
     }
-  }, [availableMonths, selectedMonth, transactions]);
+  }, [availableMonths, selectedMonth, selectedYear]);
 
   // Filter transactions for the current view
   const currentMonthTransactions = useMemo(() => {
@@ -86,20 +106,21 @@ const App: React.FC = () => {
   }, [currentMonthTransactions, manualMonthlyIncome]);
 
   const addTransaction = (t: Omit<Transaction, 'id' | 'date'>) => {
+    const now = new Date();
     const newTransaction: Transaction = {
       ...t,
       id: crypto.randomUUID(),
-      date: new Date().toISOString(), // Manual entry defaults to today
+      date: now.toISOString(), // Manual entry defaults to today
     };
     setTransactions(prev => [...prev, newTransaction]);
     
-    // Switch view to this month
-    const now = new Date();
+    // Switch view to this date
+    setSelectedYear(now.getFullYear());
     const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     setSelectedMonth(currentMonthKey);
   };
 
-  const addBulkTransactions = (newTransactions: Omit<Transaction, 'id'>[], fileName: string, metadata: AccountMetadata) => {
+  const addBulkTransactions = (newTransactions: Omit<Transaction, 'id'>[], fileName: string, metadata: Partial<AccountMetadata> = {}) => {
     const docId = crypto.randomUUID();
     
     // Create new document entry with metadata
@@ -108,7 +129,7 @@ const App: React.FC = () => {
       name: fileName,
       uploadDate: new Date().toISOString(),
       transactionCount: newTransactions.length,
-      ...metadata // Spread metadata (balance, type, accountName...)
+      ...metadata
     };
     
     setDocuments(prev => [...prev, newDoc]);
@@ -120,9 +141,14 @@ const App: React.FC = () => {
     }));
     setTransactions(prev => [...prev, ...formatted]);
     
+    // Auto-switch to the date of the latest transaction in the file
     if (formatted.length > 0) {
-       const lastDate = new Date(formatted[0].date);
-       const monthKey = `${lastDate.getFullYear()}-${String(lastDate.getMonth() + 1).padStart(2, '0')}`;
+       // Sort by date desc
+       formatted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+       const latestDate = new Date(formatted[0].date);
+       
+       setSelectedYear(latestDate.getFullYear());
+       const monthKey = `${latestDate.getFullYear()}-${String(latestDate.getMonth() + 1).padStart(2, '0')}`;
        setSelectedMonth(monthKey);
     }
   };
@@ -156,12 +182,19 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-bg font-sans pb-12">
-      {/* Category Modal */}
+      {/* Modals */}
       <CategoryDetailModal 
         isOpen={!!selectedCategoryDetail}
         onClose={() => setSelectedCategoryDetail(null)}
         category={selectedCategoryDetail}
         transactions={currentMonthTransactions}
+      />
+
+      <AnnualReportModal 
+        isOpen={isAnnualReportOpen}
+        onClose={() => setIsAnnualReportOpen(false)}
+        year={selectedYear}
+        transactions={transactions}
       />
 
       {/* Header */}
@@ -177,7 +210,13 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+          <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+            <YearSelector 
+                currentYear={selectedYear}
+                availableYears={availableYears}
+                onChange={setSelectedYear}
+            />
+
             {availableMonths.length > 0 && (
                <MonthSelector 
                  currentMonth={selectedMonth} 
@@ -191,7 +230,6 @@ const App: React.FC = () => {
               className={`p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium ${isSettingsOpen ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}
             >
               <Settings className="w-5 h-5" />
-              <span className="hidden sm:inline">Nastavení</span>
             </button>
           </div>
         </div>
@@ -353,12 +391,21 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <BudgetChart transactions={currentMonthTransactions} totalIncome={currentMonthIncome} />
               
-              {/* Savings Accounts Chart (Replaces Advisor Link) */}
+              {/* Savings Accounts Chart */}
               <SavingsAccountsChart documents={documents} />
             </div>
 
-            {/* History Chart - Full Width */}
-            <HistoryChart transactions={transactions} />
+            {/* History Chart - Now Year Specific */}
+            <div className="relative">
+                <HistoryChart transactions={transactions} year={selectedYear} />
+                <button 
+                  onClick={() => setIsAnnualReportOpen(true)}
+                  className="absolute top-5 right-40 hidden sm:flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-full transition-colors"
+                >
+                  <PieChart className="w-3 h-3" />
+                  Roční přehled
+                </button>
+            </div>
 
           </div>
 

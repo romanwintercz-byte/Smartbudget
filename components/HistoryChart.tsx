@@ -5,66 +5,65 @@ import { TrendingUp } from 'lucide-react';
 
 interface HistoryChartProps {
   transactions: Transaction[];
+  year: number;
 }
 
-export const HistoryChart: React.FC<HistoryChartProps> = ({ transactions }) => {
+export const HistoryChart: React.FC<HistoryChartProps> = ({ transactions, year }) => {
   const [showCumulative, setShowCumulative] = useState(true);
 
-  // 1. Group transactions by month (YYYY-MM)
-  const monthlyData = transactions.reduce((acc, t) => {
-    const date = new Date(t.date);
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    
-    if (!acc[key]) {
-      acc[key] = { 
-        monthKey: key, 
-        rawDate: date,
-        income: 0, 
-        expenses: 0, 
-        invested: 0 // SAVINGS category
-      };
+  // 1. Generate buckets for all 12 months of the selected year
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(year, i, 1);
+    return {
+      monthIndex: i, // 0-11
+      label: d.toLocaleDateString('cs-CZ', { month: 'short' }), // Leden, Únor...
+      fullLabel: d.toLocaleDateString('cs-CZ', { month: 'long', year: 'numeric' }),
+      income: 0,
+      expenses: 0,
+      invested: 0
+    };
+  });
+
+  // 2. Fill buckets with data from the selected year ONLY
+  transactions.forEach(t => {
+    const tDate = new Date(t.date);
+    if (tDate.getFullYear() === year) {
+      const monthIndex = tDate.getMonth();
+      const bucket = months[monthIndex];
+
+      if (t.category === 'INCOME') {
+        bucket.income += t.amount;
+      } else if (t.category === 'SAVINGS') {
+        bucket.expenses += t.amount; // Technicky výdaj z běžného účtu
+        bucket.invested += t.amount; // Ale jde do úspor
+      } else if (t.category !== 'TRANSFER') {
+        bucket.expenses += t.amount;
+      }
     }
+  });
 
-    if (t.category === 'INCOME') {
-      acc[key].income += t.amount;
-    } else if (t.category === 'SAVINGS') {
-      acc[key].expenses += t.amount; // Technicky výdaj z běžného účtu
-      acc[key].invested += t.amount; // Ale jde do úspor
-    } else if (t.category !== 'TRANSFER') {
-      acc[key].expenses += t.amount;
-    }
-
-    return acc;
-  }, {} as Record<string, { monthKey: string, rawDate: Date, income: 0, expenses: 0, invested: 0 }>);
-
-  // 2. Calculate savings flow and Cumulative Savings
+  // 3. Calculate cumulative savings (starting from 0 for this year view, or ideally fetching prev year balance)
+  // For annual view, it's often better to show accumulation WITHIN that year.
   let runningTotal = 0;
   
-  const data = Object.values(monthlyData)
-    .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
-    .map(item => {
-      const netFlow = item.income - item.expenses; 
-      const monthlySavingsGrowth = netFlow + item.invested;
-      runningTotal += monthlySavingsGrowth;
+  const data = months.map(item => {
+    const netFlow = item.income - item.expenses; 
+    const monthlySavingsGrowth = netFlow + item.invested;
+    runningTotal += monthlySavingsGrowth;
 
-      return {
-        label: item.rawDate.toLocaleDateString('cs-CZ', { month: 'short', year: '2-digit' }),
-        income: item.income,
-        expenses: item.expenses,
-        savingsFlow: netFlow, 
-        cumulativeSavings: runningTotal
-      };
-    })
-    .slice(-12); // Show last 12 months
-
-  if (data.length === 0) return null;
+    return {
+      ...item,
+      savingsFlow: netFlow, 
+      cumulativeSavings: runningTotal
+    };
+  });
 
   return (
     <div className="h-[400px] w-full bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col">
       <div className="flex justify-between items-center mb-6 px-1">
         <div>
-          <h3 className="text-lg font-bold text-slate-800">Vývoj majetku</h3>
-          <p className="text-xs text-slate-500">Měsíční toky vs. Celkové úspory</p>
+          <h3 className="text-lg font-bold text-slate-800">Roční vývoj {year}</h3>
+          <p className="text-xs text-slate-500">Příjmy, výdaje a kumulativní úspory (Jan - Pro)</p>
         </div>
         <button 
           onClick={() => setShowCumulative(!showCumulative)}
@@ -112,15 +111,24 @@ export const HistoryChart: React.FC<HistoryChartProps> = ({ transactions }) => {
             <Tooltip 
               content={({ active, payload, label }) => {
                  if (active && payload && payload.length) {
+                   const data = payload[0].payload;
                    return (
                      <div className="bg-white p-3 border border-slate-100 shadow-lg rounded-xl text-xs">
-                       <p className="font-bold text-slate-800 mb-2">{label}</p>
-                       {payload.map((entry: any) => (
-                         <div key={entry.name} className="flex items-center justify-between gap-4 mb-1">
-                           <span style={{ color: entry.color }}>{entry.name}:</span>
-                           <span className="font-semibold">{entry.value.toLocaleString('cs-CZ')}</span>
+                       <p className="font-bold text-slate-800 mb-2">{data.fullLabel}</p>
+                       <div className="flex items-center justify-between gap-4 mb-1">
+                          <span className="text-emerald-600">Příjmy:</span>
+                          <span className="font-semibold">{data.income.toLocaleString('cs-CZ')}</span>
+                       </div>
+                       <div className="flex items-center justify-between gap-4 mb-1">
+                          <span className="text-rose-500">Výdaje:</span>
+                          <span className="font-semibold">{data.expenses.toLocaleString('cs-CZ')}</span>
+                       </div>
+                       {showCumulative && (
+                         <div className="flex items-center justify-between gap-4 mt-2 pt-2 border-t border-slate-50">
+                            <span className="text-indigo-600 font-bold">Úspory (YTD):</span>
+                            <span className="font-bold text-indigo-700">{data.cumulativeSavings.toLocaleString('cs-CZ')}</span>
                          </div>
-                       ))}
+                       )}
                      </div>
                    );
                  }
@@ -140,7 +148,7 @@ export const HistoryChart: React.FC<HistoryChartProps> = ({ transactions }) => {
                 yAxisId="right" 
                 type="monotone" 
                 dataKey="cumulativeSavings" 
-                name="Celkové úspory" 
+                name="Kumulativní úspory (Rok)" 
                 stroke="#8b5cf6" 
                 strokeWidth={3}
                 fillOpacity={1} 

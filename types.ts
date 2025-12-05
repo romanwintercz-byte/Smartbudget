@@ -1,3 +1,4 @@
+
 export type CategoryType = 'NEEDS' | 'WANTS' | 'SAVINGS' | 'GIVING' | 'INCOME' | 'TRANSFER';
 
 export interface BudgetRule {
