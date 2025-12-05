@@ -1,14 +1,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Transaction, CategoryType, BUDGET_RULES } from "../types.ts";
+import { Transaction, CategoryType } from "../types.ts";
 
 const getAiClient = () => {
-  // Vite config zajistí, že process.env.API_KEY bude nahrazeno hodnotou z env proměnné
+  // Vite config nahradí process.env.API_KEY
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    console.error("API Key is missing. Make sure to set API_KEY in Vercel Environment Variables.");
-    throw new Error("API Key not found");
+    console.warn("API Key is missing via process.env.API_KEY.");
+    // Fallback pro případ, že by náhrada selhala, ale v produkci by to mělo být nahrazeno
   }
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey: apiKey || '' });
 };
 
 export const parseTransactionWithGemini = async (input: string): Promise<any> => {
@@ -16,7 +16,6 @@ export const parseTransactionWithGemini = async (input: string): Promise<any> =>
     const ai = getAiClient();
     
     // Schema for structured output
-    // Fix: Use Type enum from @google/genai for responseSchema
     const responseSchema = {
       type: Type.OBJECT,
       properties: {

@@ -5,73 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SmartBudget</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS CDN pro okamžitou funkčnost bez buildu -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-            },
-            colors: {
-              primary: '#6366f1', // Indigo
-              secondary: '#ec4899', // Pink
-              accent: '#8b5cf6', // Violet
-              bg: '#f8fafc',
-              surface: '#ffffff',
-              cat40: '#3b82f6', // Needs - Blue
-              cat30: '#a855f7', // Wants - Purple
-              cat20: '#22c55e', // Savings - Green
-              cat10: '#f97316', // Giving - Orange
-            }
-          }
-        }
-      }
-    </script>
-    
-    <!-- Polyfill pro process.env -->
-    <script>
-      if (typeof process === 'undefined') {
-        window.process = { env: {} };
-      }
-    </script>
-
-    <style>
-      body {
-        background-color: #f8fafc;
-        color: #1e293b;
-      }
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
-      }
-    </style>
   <script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.1",
-    "react-dom/client": "https://aistudiocdn.com/react-dom@^19.2.1/client",
-    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
     "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
     "react-markdown": "https://aistudiocdn.com/react-markdown@^10.1.0",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
     "vite": "https://aistudiocdn.com/vite@^7.2.6",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/"
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1"
   }
 }
 </script>
