@@ -7,8 +7,9 @@ import { Advisor } from './components/Advisor.tsx';
 import { HistoryChart } from './components/HistoryChart.tsx';
 import { MonthSelector } from './components/MonthSelector.tsx';
 import { CategoryDetailModal } from './components/CategoryDetailModal.tsx';
-import { Transaction, BUDGET_RULES, CategoryType, ImportedDocument } from './types.ts';
-import { Wallet, Settings, LayoutDashboard, Plus, Users, FileText, Trash2, ExternalLink } from 'lucide-react';
+import { SavingsAccountsChart } from './components/SavingsAccountsChart.tsx';
+import { Transaction, BUDGET_RULES, CategoryType, ImportedDocument, AccountMetadata } from './types.ts';
+import { Wallet, Settings, LayoutDashboard, Plus, FileText, Trash2, ExternalLink } from 'lucide-react';
 
 const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -98,15 +99,16 @@ const App: React.FC = () => {
     setSelectedMonth(currentMonthKey);
   };
 
-  const addBulkTransactions = (newTransactions: Omit<Transaction, 'id'>[], fileName: string) => {
+  const addBulkTransactions = (newTransactions: Omit<Transaction, 'id'>[], fileName: string, metadata: AccountMetadata) => {
     const docId = crypto.randomUUID();
     
-    // Create new document entry
+    // Create new document entry with metadata
     const newDoc: ImportedDocument = {
       id: docId,
       name: fileName,
       uploadDate: new Date().toISOString(),
-      transactionCount: newTransactions.length
+      transactionCount: newTransactions.length,
+      ...metadata // Spread metadata (balance, type, accountName...)
     };
     
     setDocuments(prev => [...prev, newDoc]);
@@ -250,6 +252,11 @@ const App: React.FC = () => {
                                 <p className="text-xs text-slate-500">
                                   {new Date(doc.uploadDate).toLocaleDateString('cs-CZ')} • {doc.transactionCount} transakcí
                                 </p>
+                                {doc.balance && (
+                                   <p className="text-xs font-semibold text-emerald-600 mt-0.5">
+                                     Zůstatek: {doc.balance.toLocaleString('cs-CZ')} {doc.currency}
+                                   </p>
+                                )}
                               </div>
                             </div>
                             <button 
@@ -346,21 +353,8 @@ const App: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <BudgetChart transactions={currentMonthTransactions} totalIncome={currentMonthIncome} />
               
-              <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 flex flex-col justify-center items-center text-center space-y-3">
-                 <div className="p-3 bg-indigo-50 rounded-full text-indigo-600">
-                   <Users className="w-6 h-6" />
-                 </div>
-                 <div>
-                   <h3 className="font-semibold text-slate-800">Smart Poradce</h3>
-                   <p className="text-sm text-slate-500 mt-1 max-w-[200px]">Potřebujete poradit s rozpočtem? Analýzu najdete v nastavení.</p>
-                 </div>
-                 <button 
-                   onClick={() => setIsSettingsOpen(true)}
-                   className="text-sm text-indigo-600 font-medium hover:text-indigo-700"
-                 >
-                   Otevřít nastavení
-                 </button>
-              </div>
+              {/* Savings Accounts Chart (Replaces Advisor Link) */}
+              <SavingsAccountsChart documents={documents} />
             </div>
 
             {/* History Chart - Full Width */}

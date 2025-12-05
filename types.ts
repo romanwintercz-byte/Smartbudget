@@ -9,7 +9,14 @@ export interface BudgetRule {
   isBudgetCategory: boolean; // Helper to filter charts
 }
 
-export interface ImportedDocument {
+export interface AccountMetadata {
+  accountName: string;
+  accountType: 'CURRENT' | 'SAVINGS'; // CURRENT = Běžný, SAVINGS = Spořicí
+  balance: number | null;
+  currency: string;
+}
+
+export interface ImportedDocument extends Partial<AccountMetadata> {
   id: string;
   name: string;
   uploadDate: string;

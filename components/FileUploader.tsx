@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { parsePdfStatement } from '../services/geminiService.ts';
-import { Transaction } from '../types.ts';
+import { Transaction, AccountMetadata } from '../types.ts';
 
 interface FileUploaderProps {
-  onTransactionsParsed: (transactions: Omit<Transaction, 'id'>[], fileName: string) => void;
+  onTransactionsParsed: (transactions: Omit<Transaction, 'id'>[], fileName: string, metadata: AccountMetadata) => void;
 }
 
 export const FileUploader: React.FC<FileUploaderProps> = ({ onTransactionsParsed }) => {
@@ -31,9 +31,9 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onTransactionsParsed
         const base64Content = base64Data.split(',')[1];
         
         try {
-          const transactions = await parsePdfStatement(base64Content);
-          if (transactions.length > 0) {
-            onTransactionsParsed(transactions, file.name);
+          const result = await parsePdfStatement(base64Content);
+          if (result.transactions.length > 0) {
+            onTransactionsParsed(result.transactions, file.name, result.accountMetadata);
           } else {
             setError("Nepodařilo se nalézt žádné transakce v tomto dokumentu.");
           }
@@ -99,7 +99,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onTransactionsParsed
           <div className="flex flex-col items-center animate-pulse">
             <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mb-3" />
             <p className="text-sm font-medium text-slate-700">Analyzuji bankovní výpis...</p>
-            <p className="text-xs text-slate-500 mt-1">Hledám transakce a detekuji převody</p>
+            <p className="text-xs text-slate-500 mt-1">Hledám transakce, zůstatky a detekuji účty</p>
           </div>
         ) : (
           <>
@@ -110,7 +110,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onTransactionsParsed
               Klikněte pro nahrání PDF výpisu
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              nebo přetáhněte soubor sem. AI automaticky detekuje kategorie a ignoruje vnitřní převody.
+              AI automaticky detekuje kategorie, zůstatky a ignoruje vnitřní převody.
             </p>
           </>
         )}
