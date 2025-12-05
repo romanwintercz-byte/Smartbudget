@@ -6,8 +6,9 @@ import { BudgetChart } from './components/BudgetChart.tsx';
 import { Advisor } from './components/Advisor.tsx';
 import { HistoryChart } from './components/HistoryChart.tsx';
 import { MonthSelector } from './components/MonthSelector.tsx';
+import { CategoryDetailModal } from './components/CategoryDetailModal.tsx';
 import { Transaction, BUDGET_RULES, CategoryType, ImportedDocument } from './types.ts';
-import { Wallet, Settings, LayoutDashboard, Plus, Users, FileText, Trash2 } from 'lucide-react';
+import { Wallet, Settings, LayoutDashboard, Plus, Users, FileText, Trash2, ExternalLink } from 'lucide-react';
 
 const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -28,6 +29,9 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'manual' | 'upload'>('manual');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  
+  // Modal state
+  const [selectedCategoryDetail, setSelectedCategoryDetail] = useState<CategoryType | null>(null);
 
   // Save data
   useEffect(() => {
@@ -150,6 +154,14 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-bg font-sans pb-12">
+      {/* Category Modal */}
+      <CategoryDetailModal 
+        isOpen={!!selectedCategoryDetail}
+        onClose={() => setSelectedCategoryDetail(null)}
+        category={selectedCategoryDetail}
+        transactions={currentMonthTransactions}
+      />
+
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -296,7 +308,7 @@ const App: React.FC = () => {
           {/* Main Content Column */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Budget Cards */}
+            {/* Budget Cards - Clickable now */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                {(Object.keys(BUDGET_RULES) as CategoryType[])
                  .filter(cat => BUDGET_RULES[cat].isBudgetCategory)
@@ -308,11 +320,20 @@ const App: React.FC = () => {
                    const isOver = spent > target && target > 0;
 
                    return (
-                     <div key={cat} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden group hover:border-indigo-100 transition-colors">
+                     <div 
+                        key={cat} 
+                        onClick={() => setSelectedCategoryDetail(cat)}
+                        className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden group hover:border-indigo-300 transition-all cursor-pointer hover:shadow-md"
+                      >
                        <div className={`absolute top-0 left-0 h-1 transition-all duration-1000 ease-out`} style={{ width: `${percentUsed}%`, backgroundColor: rule.color }}></div>
-                       <p className="text-xs font-semibold text-slate-400 mb-1 flex justify-between">
-                         <span>{rule.percentage}% {rule.label.split('(')[0].trim()}</span>
-                       </p>
+                       
+                       <div className="flex justify-between items-start mb-1">
+                         <p className="text-xs font-semibold text-slate-400">
+                           {rule.percentage}% {rule.label.split('(')[0].trim()}
+                         </p>
+                         <ExternalLink className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                       </div>
+
                        <p className="text-lg font-bold text-slate-800 tracking-tight">{formatCurrency(spent)}</p>
                        <p className="text-xs text-slate-400">cíl {formatCurrency(target)}</p>
                        {isOver && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" title="Překročen rozpočet"></span>}
@@ -324,7 +345,7 @@ const App: React.FC = () => {
             {/* Charts Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <BudgetChart transactions={currentMonthTransactions} totalIncome={currentMonthIncome} />
-              {/* Advisor removed from here, now in settings */}
+              
               <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 flex flex-col justify-center items-center text-center space-y-3">
                  <div className="p-3 bg-indigo-50 rounded-full text-indigo-600">
                    <Users className="w-6 h-6" />
