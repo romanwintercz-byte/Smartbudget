@@ -6,8 +6,8 @@ import { BudgetChart } from './components/BudgetChart.tsx';
 import { Advisor } from './components/Advisor.tsx';
 import { HistoryChart } from './components/HistoryChart.tsx';
 import { MonthSelector } from './components/MonthSelector.tsx';
-import { Transaction, BUDGET_RULES, CategoryType } from './types.ts';
-import { Wallet, Settings, LayoutDashboard, Plus, Users } from 'lucide-react';
+import { Transaction, BUDGET_RULES, CategoryType, ImportedDocument } from './types.ts';
+import { Wallet, Settings, LayoutDashboard, Plus, Users, FileText, Trash2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -15,6 +15,11 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : [];
   });
   
+  const [documents, setDocuments] = useState<ImportedDocument[]>(() => {
+    const saved = localStorage.getItem('sb_documents');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [manualMonthlyIncome, setManualMonthlyIncome] = useState<number>(() => {
     const saved = localStorage.getItem('sb_income');
     return saved ? parseFloat(saved) : 50000;
@@ -33,6 +38,10 @@ const App: React.FC = () => {
     localStorage.setItem('sb_income', manualMonthlyIncome.toString());
   }, [manualMonthlyIncome]);
 
+  useEffect(() => {
+    localStorage.setItem('sb_documents', JSON.stringify(documents));
+  }, [documents]);
+
   // Compute available months from transactions
   const availableMonths = useMemo(() => {
     const months = new Set(transactions.map(t => {
@@ -49,7 +58,7 @@ const App: React.FC = () => {
     } else if (availableMonths.length > 0 && !availableMonths.includes(selectedMonth)) {
        // If selected month was deleted or no longer valid
        setSelectedMonth(availableMonths[availableMonths.length - 1]);
-    } else if (transactions.length === 0) {
+    } else if (transactions.length === 0 && !selectedMonth) {
        // Default to current month if no data
        const now = new Date();
        setSelectedMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
@@ -63,8 +72,6 @@ const App: React.FC = () => {
   }, [transactions, selectedMonth]);
 
   // Calculate Income for the selected month
-  // Strategy: If there are INCOME transactions in the month, sum them. 
-  // If not (e.g. manual usage without income tracking), use the manual setting.
   const currentMonthIncome = useMemo(() => {
     const incomeFromTransactions = currentMonthTransactions
       .filter(t => t.category === 'INCOME')
@@ -80,20 +87,33 @@ const App: React.FC = () => {
       date: new Date().toISOString(), // Manual entry defaults to today
     };
     setTransactions(prev => [...prev, newTransaction]);
-    // Also switch view to this month if needed
+    
+    // Switch view to this month
     const now = new Date();
     const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     setSelectedMonth(currentMonthKey);
   };
 
-  const addBulkTransactions = (newTransactions: Omit<Transaction, 'id'>[]) => {
+  const addBulkTransactions = (newTransactions: Omit<Transaction, 'id'>[], fileName: string) => {
+    const docId = crypto.randomUUID();
+    
+    // Create new document entry
+    const newDoc: ImportedDocument = {
+      id: docId,
+      name: fileName,
+      uploadDate: new Date().toISOString(),
+      transactionCount: newTransactions.length
+    };
+    
+    setDocuments(prev => [...prev, newDoc]);
+
     const formatted = newTransactions.map(t => ({
       ...t,
       id: crypto.randomUUID(),
+      documentId: docId
     }));
     setTransactions(prev => [...prev, ...formatted]);
     
-    // Switch to the month of the last transaction uploaded
     if (formatted.length > 0) {
        const lastDate = new Date(formatted[0].date);
        const monthKey = `${lastDate.getFullYear()}-${String(lastDate.getMonth() + 1).padStart(2, '0')}`;
@@ -103,6 +123,19 @@ const App: React.FC = () => {
 
   const deleteTransaction = (id: string) => {
     setTransactions(prev => prev.filter(t => t.id !== id));
+  };
+
+  const updateTransactionCategory = (id: string, newCategory: CategoryType) => {
+    setTransactions(prev => prev.map(t => 
+      t.id === id ? { ...t, category: newCategory } : t
+    ));
+  };
+
+  const deleteDocument = (docId: string) => {
+    if (confirm('Opravdu chcete smazat tento dokument a všechny jeho transakce?')) {
+      setDocuments(prev => prev.filter(d => d.id !== docId));
+      setTransactions(prev => prev.filter(t => t.documentId !== docId));
+    }
   };
 
   const calculateTotal = (category?: CategoryType) => {
@@ -141,28 +174,86 @@ const App: React.FC = () => {
             
             <button 
               onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-colors"
+              className={`p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium ${isSettingsOpen ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}
             >
               <Settings className="w-5 h-5" />
+              <span className="hidden sm:inline">Nastavení</span>
             </button>
           </div>
         </div>
         
+        {/* Settings Drawer */}
         {isSettingsOpen && (
-          <div className="border-t border-slate-100 bg-slate-50 p-4 animate-in slide-in-from-top-2">
-            <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center gap-4 text-sm">
-              <div className="flex items-center gap-2 text-slate-600">
-                <Users className="w-4 h-4" />
-                <span>Tip: Nahrajte PDF výpisy všech členů rodiny. Aplikace data sloučí.</span>
-              </div>
-              <div className="flex items-center gap-4 ml-auto">
-                <label className="font-medium text-slate-600">Očekávaný měsíční příjem (pro plánování):</label>
-                <input 
-                  type="number" 
-                  value={manualMonthlyIncome}
-                  onChange={(e) => setManualMonthlyIncome(parseFloat(e.target.value) || 0)}
-                  className="px-3 py-1 border border-slate-300 rounded-md text-sm w-32"
-                />
+          <div className="border-t border-slate-100 bg-slate-50 animate-in slide-in-from-top-2 shadow-inner">
+            <div className="max-w-6xl mx-auto p-6 space-y-8">
+              
+              {/* Settings Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                {/* Column 1: Advisor & General */}
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Smart Poradce</h3>
+                    <Advisor transactions={currentMonthTransactions} totalIncome={currentMonthIncome} />
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Obecné nastavení</h3>
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                      <div className="flex flex-col gap-2">
+                         <label className="font-medium text-slate-600 text-sm">Očekávaný měsíční příjem (pro manuální režim):</label>
+                         <div className="flex items-center gap-2">
+                           <input 
+                            type="number" 
+                            value={manualMonthlyIncome}
+                            onChange={(e) => setManualMonthlyIncome(parseFloat(e.target.value) || 0)}
+                            className="px-3 py-2 border border-slate-300 rounded-md text-sm w-full focus:ring-2 focus:ring-indigo-500 outline-none"
+                           />
+                           <span className="text-slate-500 text-sm">CZK</span>
+                         </div>
+                         <p className="text-xs text-slate-400 mt-1">Pokud nahráváte výpisy s příjmy, tato hodnota bude ignorována.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: Imported Documents */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Importované výpisy</h3>
+                  <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    {documents.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400 text-sm">
+                        Zatím žádné importované soubory.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {documents.map(doc => (
+                          <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className="bg-indigo-100 p-2 rounded-lg text-indigo-600">
+                                <FileText className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-medium text-slate-800 text-sm truncate">{doc.name}</p>
+                                <p className="text-xs text-slate-500">
+                                  {new Date(doc.uploadDate).toLocaleDateString('cs-CZ')} • {doc.transactionCount} transakcí
+                                </p>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => deleteDocument(doc.id)}
+                              className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Smazat soubor a transakce"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>
@@ -233,7 +324,22 @@ const App: React.FC = () => {
             {/* Charts Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <BudgetChart transactions={currentMonthTransactions} totalIncome={currentMonthIncome} />
-              <Advisor transactions={currentMonthTransactions} totalIncome={currentMonthIncome} />
+              {/* Advisor removed from here, now in settings */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 flex flex-col justify-center items-center text-center space-y-3">
+                 <div className="p-3 bg-indigo-50 rounded-full text-indigo-600">
+                   <Users className="w-6 h-6" />
+                 </div>
+                 <div>
+                   <h3 className="font-semibold text-slate-800">Smart Poradce</h3>
+                   <p className="text-sm text-slate-500 mt-1 max-w-[200px]">Potřebujete poradit s rozpočtem? Analýzu najdete v nastavení.</p>
+                 </div>
+                 <button 
+                   onClick={() => setIsSettingsOpen(true)}
+                   className="text-sm text-indigo-600 font-medium hover:text-indigo-700"
+                 >
+                   Otevřít nastavení
+                 </button>
+              </div>
             </div>
 
             {/* History Chart - Full Width */}
@@ -256,7 +362,8 @@ const App: React.FC = () => {
 
             <TransactionList 
               transactions={currentMonthTransactions} 
-              onDelete={deleteTransaction} 
+              onDelete={deleteTransaction}
+              onCategoryChange={updateTransactionCategory}
             />
           </div>
 

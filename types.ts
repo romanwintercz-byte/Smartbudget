@@ -9,6 +9,13 @@ export interface BudgetRule {
   isBudgetCategory: boolean; // Helper to filter charts
 }
 
+export interface ImportedDocument {
+  id: string;
+  name: string;
+  uploadDate: string;
+  transactionCount: number;
+}
+
 export interface Transaction {
   id: string;
   description: string;
@@ -17,6 +24,7 @@ export interface Transaction {
   category: CategoryType;
   date: string;
   isAiGenerated?: boolean;
+  documentId?: string; // Reference na importovaný soubor
 }
 
 export interface AiParseResult {

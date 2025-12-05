@@ -4,7 +4,7 @@ import { parsePdfStatement } from '../services/geminiService.ts';
 import { Transaction } from '../types.ts';
 
 interface FileUploaderProps {
-  onTransactionsParsed: (transactions: Omit<Transaction, 'id'>[]) => void;
+  onTransactionsParsed: (transactions: Omit<Transaction, 'id'>[], fileName: string) => void;
 }
 
 export const FileUploader: React.FC<FileUploaderProps> = ({ onTransactionsParsed }) => {
@@ -33,7 +33,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ onTransactionsParsed
         try {
           const transactions = await parsePdfStatement(base64Content);
           if (transactions.length > 0) {
-            onTransactionsParsed(transactions);
+            onTransactionsParsed(transactions, file.name);
           } else {
             setError("Nepodařilo se nalézt žádné transakce v tomto dokumentu.");
           }
