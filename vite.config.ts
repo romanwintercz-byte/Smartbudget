@@ -3,19 +3,15 @@ import react from '@vitejs/plugin-react';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Načtení env proměnných pro build proces.
-  // Používáme process.cwd() pro získání aktuálního adresáře.
-  // Třetí argument '' zajistí načtení všech env proměnných, ne jen těch s prefixem VITE_.
+  // Načtení env proměnných pro build proces ze souborů.
   const env = loadEnv(mode, process.cwd(), '');
   
   return {
     plugins: [react()],
     define: {
       // Bezpečné vložení API klíče.
-      // Toto umožní používat process.env.API_KEY v klientském kódu.
-      // Pokud env.API_KEY není definován (např. v CI/CD bez env vars), vloží se prázdný řetězec,
-      // což je bezpečnější než nechat undefined, které může způsobit chyby při nahrazování nebo běhu.
-      'process.env.API_KEY': JSON.stringify(env.API_KEY || '')
+      // DŮLEŽITÉ: Pořadí je env.API_KEY (ze souboru) || process.env.API_KEY (z Vercel CI/CD) || ''
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY || '')
     }
   };
 });
