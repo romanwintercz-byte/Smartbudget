@@ -1,0 +1,5 @@
+{
+  "name": "SmartBudget 40-30-20-10",
+  "description": "Sofistikovaný sledovač rodinného rozpočtu využívající pravidlo 40/30/20/10. Vlastnosti zahrnují AI kategorizaci výdajů a finanční poradenství v češtině pomocí Gemini.",
+  "requestFramePermissions": []
+}
