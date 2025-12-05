@@ -54,8 +54,22 @@ export const BudgetChart: React.FC<BudgetChartProps> = ({ transactions, totalInc
             ))}
           </Pie>
           <Tooltip 
-             formatter={(value: number) => value.toLocaleString('cs-CZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' CZK'}
-             contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+             content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload;
+                  // Calculate percentage relative to Income (since pie shows distribution of income)
+                  const percent = totalIncome > 0 ? ((data.value / totalIncome) * 100).toFixed(1) : 0;
+                  
+                  return (
+                    <div className="bg-white p-2 border border-slate-100 shadow-md rounded-lg text-xs">
+                       <span className="font-semibold block mb-1" style={{ color: data.color }}>{data.name}</span>
+                       <span className="font-bold">{data.value.toLocaleString('cs-CZ')} CZK</span>
+                       <span className="text-slate-400 ml-1">({percent}%)</span>
+                    </div>
+                  );
+                }
+                return null;
+             }}
           />
           <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
         </PieChart>

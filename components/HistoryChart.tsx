@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { ComposedChart, Bar, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Transaction } from '../types.ts';
 import { TrendingUp } from 'lucide-react';
 
@@ -43,18 +43,7 @@ export const HistoryChart: React.FC<HistoryChartProps> = ({ transactions }) => {
   const data = Object.values(monthlyData)
     .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
     .map(item => {
-      // Flow = Příjmy - Všechny výdaje (včetně toho, co šlo na spoření)
-      // Pokud uživatel nahrává výpis ze spořícího účtu, může to být složitější, 
-      // ale základní logika je: Co zbylo z příjmů + Co jsem cíleně poslal na SAVINGS
-      
       const netFlow = item.income - item.expenses; 
-      
-      // Kumulativní úspory: K tomu, co jsem měl, přičtu čistý tok + to co jsem poslal na investice (protože to nejsou utracené peníze, ale aktiva)
-      // Zjednodušeně: Úspory rostou o (Income - (Expenses - Invested)) -> Income - RealConsumed
-      // RealConsumed = Expenses - Invested
-      // SavingsIncrement = Income - RealConsumed = Income - (Expenses - Invested) = Income - Expenses + Invested
-      // Ale jednodušeji: NetFlow (co zbylo na BÚ) + Invested (co odešlo na SÚ)
-      
       const monthlySavingsGrowth = netFlow + item.invested;
       runningTotal += monthlySavingsGrowth;
 
@@ -62,8 +51,8 @@ export const HistoryChart: React.FC<HistoryChartProps> = ({ transactions }) => {
         label: item.rawDate.toLocaleDateString('cs-CZ', { month: 'short', year: '2-digit' }),
         income: item.income,
         expenses: item.expenses,
-        savingsFlow: netFlow, // Kolik zbylo na účtu
-        cumulativeSavings: runningTotal // Celkové jmění (nárůst)
+        savingsFlow: netFlow, 
+        cumulativeSavings: runningTotal
       };
     })
     .slice(-12); // Show last 12 months
@@ -71,36 +60,43 @@ export const HistoryChart: React.FC<HistoryChartProps> = ({ transactions }) => {
   if (data.length === 0) return null;
 
   return (
-    <div className="h-[400px] w-full bg-white rounded-xl shadow-sm border border-slate-100 p-4 flex flex-col">
-      <div className="flex justify-between items-center mb-4 px-2">
+    <div className="h-[400px] w-full bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col">
+      <div className="flex justify-between items-center mb-6 px-1">
         <div>
-          <h3 className="text-lg font-semibold text-slate-800">Vývoj financí</h3>
-          <p className="text-xs text-slate-500">Příjmy vs. Výdaje a růst úspor</p>
+          <h3 className="text-lg font-bold text-slate-800">Vývoj majetku</h3>
+          <p className="text-xs text-slate-500">Měsíční toky vs. Celkové úspory</p>
         </div>
         <button 
           onClick={() => setShowCumulative(!showCumulative)}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${showCumulative ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${showCumulative ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
         >
           <TrendingUp className="w-3 h-3" />
-          {showCumulative ? 'Skrýt kumulativní úspory' : 'Zobrazit kumulativní úspory'}
+          {showCumulative ? 'Skrýt úspory' : 'Zobrazit úspory'}
         </button>
       </div>
       
       <div className="flex-grow min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <defs>
+              <linearGradient id="colorSavings" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
             <XAxis 
               dataKey="label" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: '#64748b', fontSize: 12 }} 
+              tick={{ fill: '#94a3b8', fontSize: 11 }} 
+              dy={10}
             />
             <YAxis 
               yAxisId="left"
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: '#64748b', fontSize: 12 }}
+              tick={{ fill: '#94a3b8', fontSize: 11 }}
               tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
             />
             {showCumulative && (
@@ -109,38 +105,47 @@ export const HistoryChart: React.FC<HistoryChartProps> = ({ transactions }) => {
                 orientation="right"
                 axisLine={false} 
                 tickLine={false} 
-                tick={{ fill: '#8b5cf6', fontSize: 12 }}
+                tick={{ fill: '#8b5cf6', fontSize: 11, fontWeight: 600 }}
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
               />
             )}
             <Tooltip 
-              formatter={(value: number, name: string) => {
-                if (name === 'cumulativeSavings') return [value.toLocaleString('cs-CZ') + ' CZK', 'Celkové úspory'];
-                if (name === 'income') return [value.toLocaleString('cs-CZ') + ' CZK', 'Příjmy'];
-                if (name === 'expenses') return [value.toLocaleString('cs-CZ') + ' CZK', 'Výdaje'];
-                return [value.toLocaleString('cs-CZ') + ' CZK', name];
+              content={({ active, payload, label }) => {
+                 if (active && payload && payload.length) {
+                   return (
+                     <div className="bg-white p-3 border border-slate-100 shadow-lg rounded-xl text-xs">
+                       <p className="font-bold text-slate-800 mb-2">{label}</p>
+                       {payload.map((entry: any) => (
+                         <div key={entry.name} className="flex items-center justify-between gap-4 mb-1">
+                           <span style={{ color: entry.color }}>{entry.name}:</span>
+                           <span className="font-semibold">{entry.value.toLocaleString('cs-CZ')}</span>
+                         </div>
+                       ))}
+                     </div>
+                   );
+                 }
+                 return null;
               }}
-              cursor={{ fill: '#f8fafc' }}
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
             />
-            <Legend iconType="circle" />
+            <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '12px' }}/>
             <ReferenceLine yAxisId="left" y={0} stroke="#cbd5e1" />
             
             {/* Bars for monthly flow */}
-            <Bar yAxisId="left" name="Příjmy" dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} fillOpacity={0.8} />
-            <Bar yAxisId="left" name="Výdaje" dataKey="expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={20} fillOpacity={0.8} />
+            <Bar yAxisId="left" name="Příjmy" dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} barSize={12} fillOpacity={0.6} />
+            <Bar yAxisId="left" name="Výdaje" dataKey="expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={12} fillOpacity={0.6} />
             
-            {/* Line for Cumulative Savings */}
+            {/* Area for Cumulative Savings */}
             {showCumulative && (
-              <Line 
+              <Area 
                 yAxisId="right" 
                 type="monotone" 
                 dataKey="cumulativeSavings" 
-                name="Kumulativní úspory" 
-                stroke="#6366f1" 
+                name="Celkové úspory" 
+                stroke="#8b5cf6" 
                 strokeWidth={3}
-                dot={{ r: 4, fill: "#6366f1", strokeWidth: 2, stroke: "#fff" }}
-                activeDot={{ r: 6 }}
+                fillOpacity={1} 
+                fill="url(#colorSavings)" 
+                activeDot={{ r: 6, strokeWidth: 0 }}
               />
             )}
           </ComposedChart>

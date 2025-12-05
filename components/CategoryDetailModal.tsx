@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { X, PieChart as PieIcon, TrendingDown } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { X, PieChart as PieIcon } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Transaction, CategoryType, BUDGET_RULES } from '../types.ts';
 
 interface CategoryDetailModalProps {
@@ -10,7 +10,7 @@ interface CategoryDetailModalProps {
   transactions: Transaction[];
 }
 
-const COLORS = ['#6366f1', '#ec4899', '#8b5cf6', '#f59e0b', '#10b981', '#94a3b8'];
+const COLORS = ['#6366f1', '#ec4899', '#8b5cf6', '#f59e0b', '#10b981', '#94a3b8', '#3b82f6', '#ef4444'];
 
 export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({ isOpen, onClose, category, transactions }) => {
   if (!isOpen || !category) return null;
@@ -24,8 +24,6 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({ isOpen
     // Group by description
     const groups: Record<string, number> = {};
     filtered.forEach(t => {
-      // Zjednodušení popisu (odstranění čísel na konci, aby se sloučily např. "Billa 01" a "Billa 02")
-      // Pro jednoduchost bereme celý popis, uživatel může přejmenovat transakce
       const key = t.description.trim();
       groups[key] = (groups[key] || 0) + t.amount;
     });
@@ -37,11 +35,11 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({ isOpen
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
 
-    // Take top 5 and group rest to "Ostatní"
-    const top5 = sortedGroups.slice(0, 5);
-    const othersValue = sortedGroups.slice(5).reduce((sum, item) => sum + item.value, 0);
+    // Take top 8 and group rest to "Ostatní" (zvýšeno z 5, když nemáme seznam)
+    const topItems = sortedGroups.slice(0, 8);
+    const othersValue = sortedGroups.slice(8).reduce((sum, item) => sum + item.value, 0);
     
-    const chartData = [...top5];
+    const chartData = [...topItems];
     if (othersValue > 0) {
       chartData.push({ name: 'Ostatní', value: othersValue });
     }
@@ -49,24 +47,25 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({ isOpen
     return {
       chartData,
       totalAmount,
-      transactionCount: filtered.length,
-      topTransactions: filtered.sort((a, b) => b.amount - a.amount).slice(0, 10)
+      transactionCount: filtered.length
     };
   }, [transactions, category]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm" style={{ backgroundColor: rule.color }}>
               <PieIcon className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">{rule.label}</h2>
-              <p className="text-sm text-slate-500">Detailní analýza útraty</p>
+              <p className="text-sm text-slate-500">
+                Celkem: <span className="font-semibold text-slate-700">{stats.totalAmount.toLocaleString('cs-CZ')} CZK</span>
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white rounded-full transition-colors text-slate-400 hover:text-slate-600">
@@ -74,78 +73,54 @@ export const CategoryDetailModal: React.FC<CategoryDetailModalProps> = ({ isOpen
           </button>
         </div>
 
-        {/* Content */}
-        <div className="overflow-y-auto p-6 space-y-8">
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-            {/* Chart */}
-            <div className="h-[250px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+        {/* Content - Pure Chart */}
+        <div className="p-6 flex flex-col items-center justify-center bg-white min-h-[400px]">
+           {stats.chartData.length > 0 ? (
+             <ResponsiveContainer width="100%" height={350}>
                 <PieChart>
                   <Pie
                     data={stats.chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
+                    innerRadius={80}
+                    outerRadius={120}
+                    paddingAngle={2}
                     dataKey="value"
+                    stroke="#fff"
+                    strokeWidth={2}
                   >
                     {stats.chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip 
-                    formatter={(value: number) => value.toLocaleString('cs-CZ') + ' CZK'}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        const percent = ((data.value / stats.totalAmount) * 100).toFixed(1);
+                        return (
+                          <div className="bg-white p-3 border border-slate-100 shadow-xl rounded-xl">
+                            <p className="font-bold text-slate-800 text-sm mb-1">{data.name}</p>
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-indigo-600 font-bold">{data.value.toLocaleString('cs-CZ')} CZK</span>
+                              <span className="text-xs text-slate-400">({percent}%)</span>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
                   />
-                  <Legend />
                 </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Summary Info */}
-            <div className="space-y-4">
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <p className="text-sm text-slate-500 mb-1">Celkem utraceno</p>
-                <p className="text-2xl font-bold text-slate-900">{stats.totalAmount.toLocaleString('cs-CZ')} CZK</p>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <p className="text-sm text-slate-500 mb-1">Počet plateb</p>
-                <p className="text-2xl font-bold text-slate-900">{stats.transactionCount}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Top Spenders List */}
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <TrendingDown className="w-4 h-4" />
-              Největší platby
-            </h3>
-            <div className="space-y-3">
-              {stats.topTransactions.map((t) => (
-                <div key={t.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg transition-colors border border-transparent hover:border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">
-                      {t.description.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-800">{t.description}</p>
-                      <p className="text-xs text-slate-400">{new Date(t.date).toLocaleDateString('cs-CZ')}</p>
-                    </div>
-                  </div>
-                  <span className="font-bold text-slate-700">
-                    -{t.amount.toLocaleString('cs-CZ')} <span className="text-xs font-normal text-slate-400">{t.currency}</span>
-                  </span>
-                </div>
-              ))}
-              {stats.topTransactions.length === 0 && (
-                 <p className="text-center text-slate-400 py-4">Žádné transakce v této kategorii.</p>
-              )}
-            </div>
-          </div>
-
+             </ResponsiveContainer>
+           ) : (
+             <div className="text-center text-slate-400">
+                <p>V této kategorii zatím nejsou žádné transakce.</p>
+             </div>
+           )}
+           <p className="text-xs text-slate-400 mt-2 text-center">
+             Najeďte myší na graf pro zobrazení detailů obchodníka.
+           </p>
         </div>
       </div>
     </div>
