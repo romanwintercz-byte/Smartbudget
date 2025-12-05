@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { SmartInput } from './components/SmartInput.tsx';
+import { FileUploader } from './components/FileUploader.tsx';
 import { TransactionList } from './components/TransactionList.tsx';
 import { BudgetChart } from './components/BudgetChart.tsx';
 import { Advisor } from './components/Advisor.tsx';
 import { Transaction, BUDGET_RULES, CategoryType } from './types.ts';
-import { Wallet, Settings } from 'lucide-react';
+import { Wallet, Settings, LayoutDashboard, Plus } from 'lucide-react';
 
 const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
@@ -17,6 +18,7 @@ const App: React.FC = () => {
     return saved ? parseFloat(saved) : 50000;
   });
 
+  const [activeTab, setActiveTab] = useState<'manual' | 'upload'>('manual');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
@@ -34,6 +36,14 @@ const App: React.FC = () => {
       date: new Date().toISOString(),
     };
     setTransactions(prev => [...prev, newTransaction]);
+  };
+
+  const addBulkTransactions = (newTransactions: Omit<Transaction, 'id'>[]) => {
+    const formatted = newTransactions.map(t => ({
+      ...t,
+      id: crypto.randomUUID(),
+    }));
+    setTransactions(prev => [...prev, ...formatted]);
   };
 
   const deleteTransaction = (id: string) => {
@@ -77,7 +87,7 @@ const App: React.FC = () => {
         {isSettingsOpen && (
           <div className="border-t border-slate-100 bg-slate-50 p-4 animate-in slide-in-from-top-2">
             <div className="max-w-5xl mx-auto flex items-center gap-4">
-              <label className="text-sm font-medium text-slate-600">Čistý měsíční příjem:</label>
+              <label className="text-sm font-medium text-slate-600">Čistý měsíční příjem (pro výpočty cílů):</label>
               <input 
                 type="number" 
                 value={monthlyIncome}
@@ -91,9 +101,30 @@ const App: React.FC = () => {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         
-        {/* Smart Input Hero */}
-        <section className="max-w-2xl mx-auto">
-          <SmartInput onAddTransaction={addTransaction} />
+        {/* Input Method Tabs */}
+        <section className="max-w-2xl mx-auto mb-6">
+          <div className="flex bg-slate-100 p-1 rounded-lg w-fit mx-auto mb-4">
+             <button 
+               onClick={() => setActiveTab('manual')}
+               className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'manual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+             >
+               <Plus className="w-4 h-4" />
+               Rychlý vstup
+             </button>
+             <button 
+               onClick={() => setActiveTab('upload')}
+               className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'upload' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+             >
+               <LayoutDashboard className="w-4 h-4" />
+               Nahrát PDF Výpis
+             </button>
+          </div>
+
+          {activeTab === 'manual' ? (
+             <SmartInput onAddTransaction={addTransaction} />
+          ) : (
+             <FileUploader onTransactionsParsed={addBulkTransactions} />
+          )}
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-6">
@@ -101,24 +132,26 @@ const App: React.FC = () => {
           {/* Left Column: Stats & Chart */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Cards Grid */}
+            {/* Cards Grid - Only Budget Categories */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-               {(Object.keys(BUDGET_RULES) as CategoryType[]).map(cat => {
-                 const rule = BUDGET_RULES[cat];
-                 const spent = calculateTotal(cat);
-                 const target = (monthlyIncome * rule.percentage) / 100;
-                 const percentUsed = Math.min((spent / target) * 100, 100);
-                 const isOver = spent > target;
+               {(Object.keys(BUDGET_RULES) as CategoryType[])
+                 .filter(cat => BUDGET_RULES[cat].isBudgetCategory)
+                 .map(cat => {
+                   const rule = BUDGET_RULES[cat];
+                   const spent = calculateTotal(cat);
+                   const target = (monthlyIncome * rule.percentage) / 100;
+                   const percentUsed = Math.min((spent / target) * 100, 100);
+                   const isOver = spent > target;
 
-                 return (
-                   <div key={cat} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden">
-                     <div className={`absolute top-0 left-0 h-1 transition-all duration-500`} style={{ width: `${percentUsed}%`, backgroundColor: rule.color }}></div>
-                     <p className="text-xs font-semibold text-slate-400 mb-1">{rule.percentage}% {rule.label.split('(')[0].trim()}</p>
-                     <p className="text-lg font-bold text-slate-800">{formatCurrency(spent)}</p>
-                     <p className="text-xs text-slate-400">z {formatCurrency(target)}</p>
-                     {isOver && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" title="Překročen rozpočet"></span>}
-                   </div>
-                 )
+                   return (
+                     <div key={cat} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm relative overflow-hidden">
+                       <div className={`absolute top-0 left-0 h-1 transition-all duration-500`} style={{ width: `${percentUsed}%`, backgroundColor: rule.color }}></div>
+                       <p className="text-xs font-semibold text-slate-400 mb-1">{rule.percentage}% {rule.label.split('(')[0].trim()}</p>
+                       <p className="text-lg font-bold text-slate-800">{formatCurrency(spent)}</p>
+                       <p className="text-xs text-slate-400">z {formatCurrency(target)}</p>
+                       {isOver && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" title="Překročen rozpočet"></span>}
+                     </div>
+                   )
                })}
             </div>
 

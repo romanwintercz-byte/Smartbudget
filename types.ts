@@ -1,11 +1,12 @@
-export type CategoryType = 'NEEDS' | 'WANTS' | 'SAVINGS' | 'GIVING';
+export type CategoryType = 'NEEDS' | 'WANTS' | 'SAVINGS' | 'GIVING' | 'INCOME' | 'TRANSFER';
 
 export interface BudgetRule {
   type: CategoryType;
   label: string;
-  percentage: number;
+  percentage: number; // 0 for income/transfer
   color: string;
   description: string;
+  isBudgetCategory: boolean; // Helper to filter charts
 }
 
 export interface Transaction {
@@ -32,27 +33,47 @@ export const BUDGET_RULES: Record<CategoryType, BudgetRule> = {
     label: 'Nutné výdaje (40%)',
     percentage: 40,
     color: '#3b82f6', // Blue
-    description: 'Bydlení, jídlo, energie, doprava'
+    description: 'Bydlení, jídlo, energie, doprava',
+    isBudgetCategory: true
   },
   WANTS: {
     type: 'WANTS',
     label: 'Radosti (30%)',
     percentage: 30,
     color: '#a855f7', // Purple
-    description: 'Zábava, restaurace, koníčky, nákupy'
+    description: 'Zábava, restaurace, koníčky, nákupy',
+    isBudgetCategory: true
   },
   SAVINGS: {
     type: 'SAVINGS',
     label: 'Budoucnost (20%)',
     percentage: 20,
     color: '#22c55e', // Green
-    description: 'Investice, spoření, splácení dluhů'
+    description: 'Investice, spoření, splácení dluhů',
+    isBudgetCategory: true
   },
   GIVING: {
     type: 'GIVING',
     label: 'Dary a pomoc (10%)',
     percentage: 10,
     color: '#f97316', // Orange
-    description: 'Charita, dárky, finanční rezerva'
+    description: 'Charita, dárky, finanční rezerva',
+    isBudgetCategory: true
+  },
+  INCOME: {
+    type: 'INCOME',
+    label: 'Příjem',
+    percentage: 0,
+    color: '#10b981', // Emerald
+    description: 'Mzda, dividendy, vklady',
+    isBudgetCategory: false
+  },
+  TRANSFER: {
+    type: 'TRANSFER',
+    label: 'Interní převod',
+    percentage: 0,
+    color: '#94a3b8', // Slate
+    description: 'Převody mezi vlastními účty, splátky kreditek',
+    isBudgetCategory: false
   }
 };
