@@ -11,7 +11,7 @@ import { CategoryDetailModal } from './components/CategoryDetailModal.tsx';
 import { SavingsAccountsChart } from './components/SavingsAccountsChart.tsx';
 import { AnnualReportModal } from './components/AnnualReportModal.tsx';
 import { Transaction, BUDGET_RULES, CategoryType, ImportedDocument, AccountMetadata } from './types.ts';
-import { Wallet, Settings, LayoutDashboard, Plus, Users, FileText, Trash2, ExternalLink, PieChart } from 'lucide-react';
+import { Wallet, Settings, LayoutDashboard, Plus, FileText, Trash2, ExternalLink, PieChart } from 'lucide-react';
 
 const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>(() => {

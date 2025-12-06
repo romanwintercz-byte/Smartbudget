@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Transaction, CategoryType, AccountMetadata, BUDGET_RULES } from "../types.ts";
+import { Transaction, CategoryType, BUDGET_RULES } from "../types.ts";
 
 const getAiClient = () => {
   // Vite config zajistí, že process.env.API_KEY bude nahrazeno hodnotou z env proměnné
@@ -57,67 +57,40 @@ export const parseTransactionWithGemini = async (input: string): Promise<any> =>
   }
 };
 
-interface PdfParseResponse {
-  transactions: Omit<Transaction, 'id'>[];
-  accountMetadata: AccountMetadata;
-}
-
-export const parsePdfStatement = async (base64Pdf: string): Promise<PdfParseResponse> => {
+export const parsePdfStatement = async (base64Pdf: string): Promise<Omit<Transaction, 'id'>[]> => {
   try {
     const ai = getAiClient();
 
-    // Komplexní schéma pro transakce I metadata o účtu
+    // Schema pro pole transakcí
     const responseSchema = {
-      type: Type.OBJECT,
-      properties: {
-        accountMetadata: {
-          type: Type.OBJECT,
-          properties: {
-             accountName: { type: Type.STRING, description: "Název účtu nalezený na výpisu (např. 'Air Bank Spoření', 'Můj Účet')." },
-             accountType: { type: Type.STRING, enum: ['CURRENT', 'SAVINGS'], description: "Typ účtu. 'SAVINGS' pokud jde o spořící účet, 'CURRENT' pro běžný." },
-             balance: { type: Type.NUMBER, description: "Konečný zůstatek (Ending Balance) uvedený na výpisu." },
-             currency: { type: Type.STRING, description: "Měna účtu (CZK, EUR...)" }
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          date: { type: Type.STRING, description: "Datum transakce ve formátu ISO YYYY-MM-DD" },
+          amount: { type: Type.NUMBER, description: "Absolutní hodnota částky." },
+          currency: { type: Type.STRING, description: "Měna (CZK, EUR...)" },
+          description: { type: Type.STRING, description: "Popis transakce" },
+          category: { 
+            type: Type.STRING, 
+            enum: ["NEEDS", "WANTS", "SAVINGS", "GIVING", "INCOME", "TRANSFER"],
+            description: "Kategorie výdaje nebo příjmu."
           },
-          required: ["accountName", "accountType", "currency"]
-        },
-        transactions: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              date: { type: Type.STRING, description: "Datum transakce ve formátu ISO YYYY-MM-DD" },
-              amount: { type: Type.NUMBER, description: "Absolutní hodnota částky." },
-              currency: { type: Type.STRING, description: "Měna (CZK, EUR...)" },
-              description: { type: Type.STRING, description: "Popis transakce" },
-              category: { 
-                type: Type.STRING, 
-                enum: ["NEEDS", "WANTS", "SAVINGS", "GIVING", "INCOME", "TRANSFER"],
-                description: "Kategorie výdaje nebo příjmu."
-              },
-              type: {
-                type: Type.STRING,
-                enum: ["EXPENSE", "INCOME", "TRANSFER"],
-                description: "Typ pohybu. EXPENSE pro výdaje, INCOME pro příjmy (mzda), TRANSFER pro vnitřní převody."
-              }
-            },
-            required: ["date", "amount", "currency", "description", "category", "type"]
+          type: {
+            type: Type.STRING,
+            enum: ["EXPENSE", "INCOME", "TRANSFER"],
+            description: "Typ pohybu. EXPENSE pro výdaje, INCOME pro příjmy (mzda), TRANSFER pro vnitřní převody."
           }
-        }
-      },
-      required: ["accountMetadata", "transactions"]
+        },
+        required: ["date", "amount", "currency", "description", "category", "type"]
+      }
     };
 
     const prompt = `
       Analyzuj tento bankovní výpis (PDF). 
+      Ignoruj počáteční a konečné zůstatky, zajímají mě jen jednotlivé transakce.
       
-      ÚKOL 1: Metadata účtu
-      - Najdi konečný zůstatek (Ending Balance).
-      - Zjisti název účtu nebo banky.
-      - Urči, zda jde o Spořicí účet (Savings) nebo Běžný účet (Current/Checking). Pokud jsou tam úroky, je to pravděpodobně spořicí.
-
-      ÚKOL 2: Transakce
-      - Ignoruj počáteční zůstatky, zajímají mě jen jednotlivé transakce.
-      - Inteligentně kategorizuj každou položku.
+      Tvým úkolem je inteligentně kategorizovat každou položku.
       
       DŮLEŽITÁ PRAVIDLA PRO PŘEVODY (TRANSFER):
       - Pokud je transakce splátka kreditní karty z běžného účtu, označ to jako TRANSFER.
@@ -153,12 +126,12 @@ export const parsePdfStatement = async (base64Pdf: string): Promise<PdfParseResp
     });
 
     const text = response.text;
-    if (!text) throw new Error("Empty response from AI");
+    if (!text) return [];
     
     const parsedData = JSON.parse(text);
     
-    // Mapování transakcí
-    const transactions = parsedData.transactions.map((item: any) => ({
+    // Mapování výsledků na Transaction interface
+    return parsedData.map((item: any) => ({
       date: item.date,
       description: item.description,
       amount: item.amount,
@@ -166,11 +139,6 @@ export const parsePdfStatement = async (base64Pdf: string): Promise<PdfParseResp
       category: item.category,
       isAiGenerated: true
     }));
-
-    return {
-      transactions,
-      accountMetadata: parsedData.accountMetadata
-    };
 
   } catch (error) {
     console.error("Gemini PDF Parse Error:", error);

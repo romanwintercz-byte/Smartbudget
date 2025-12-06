@@ -62,7 +62,7 @@ export const SavingsAccountsChart: React.FC<SavingsAccountsChartProps> = ({ docu
             />
             <Tooltip
               cursor={{ fill: '#f8fafc' }}
-              content={({ active, payload, label }) => {
+              content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   const data = payload[0].payload;
                   return (
